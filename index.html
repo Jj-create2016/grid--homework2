@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>校园绿色电力小脑 — AI智能调度系统</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    background: #0a1628;
+    color: #e0e8f0;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  .container { max-width: 1200px; margin: 0 auto; }
+  h1 {
+    font-size: 26px;
+    text-align: center;
+    margin-bottom: 5px;
+    background: linear-gradient(90deg, #4ade80, #22d3ee);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle { text-align: center; color: #7a8fa8; font-size: 13px; margin-bottom: 20px; }
+
+  /* 参数输入面板 */
+  .panel {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 18px;
+  }
+  .panel h2 { font-size: 15px; color: #b0c4de; margin-bottom: 14px; font-weight: 600; }
+  .inputs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+  }
+  .field label {
+    display: block; font-size: 12px; color: #7a8fa8; margin-bottom: 5px;
+  }
+  .field input {
+    width: 100%; padding: 9px 10px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    color: #e0e8f0; font-size: 14px;
+    font-family: inherit;
+    transition: border 0.2s;
+  }
+  .field input:focus {
+    outline: none;
+    border-color: #22c55e;
+    box-shadow: 0 0 0 2px rgba(34,197,94,0.15);
+  }
+  .field .hint { font-size: 11px; color: #4a5a6a; margin-top: 3px; }
+
+  .controls { display: flex; gap: 12px; justify-content: center; margin-bottom: 18px; flex-wrap: wrap; }
+  button {
+    padding: 11px 26px; border: none; border-radius: 8px;
+    font-size: 15px; font-weight: 600; cursor: pointer;
+    transition: all 0.2s; font-family: inherit;
+  }
+  .btn-run { background: linear-gradient(135deg, #22c55e, #06b6d4); color: #fff; }
+  .btn-run:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(34,197,94,0.3); }
+  .btn-reset { background: rgba(255,255,255,0.1); color: #b0c4de; }
+  .btn-reset:hover { background: rgba(255,255,255,0.15); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  /* 统计卡片 */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px; margin-bottom: 18px;
+  }
+  .stat-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px; padding: 12px; text-align: center;
+  }
+  .stat-card .label { font-size: 12px; color: #7a8fa8; margin-bottom: 5px; }
+  .stat-card .value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat-card .unit { font-size: 11px; color: #7a8fa8; margin-left: 2px; }
+  .green { color: #4ade80; } .cyan { color: #22d3ee; } .yellow { color: #fbbf24; }
+  .red { color: #f87171; } .purple { color: #a78bfa; }
+
+  /* 目标达成提示 */
+  .target-bar {
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px; padding: 14px 18px; margin-bottom: 18px;
+  }
+  .target-bar .icon { font-size: 26px; }
+  .target-bar .info { flex: 1; }
+  .target-bar .title { font-size: 13px; color: #7a8fa8; margin-bottom: 4px; }
+  .target-bar .result { font-size: 17px; font-weight: 700; }
+  .progress-wrap { flex: 2; min-width: 120px; }
+  .progress-bg {
+    height: 10px; background: rgba(0,0,0,0.3);
+    border-radius: 5px; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #22c55e, #22d3ee);
+    border-radius: 5px; transition: width 0.6s ease;
+  }
+  .progress-text { font-size: 11px; color: #7a8fa8; margin-top: 4px; text-align: right; }
+
+  .chart-wrap, .log-wrap {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px; padding: 16px; margin-bottom: 18px;
+  }
+  .chart-wrap h2, .log-wrap h2 {
+    font-size: 15px; color: #b0c4de; margin-bottom: 12px; font-weight: 600;
+  }
+  canvas { width: 100%; height: auto; display: block; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: #7a8fa8; }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .log-wrap { max-height: 200px; overflow-y: auto; }
+  .log-entry {
+    font-size: 13px; color: #8aa0b8; padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-family: "Consolas", "Monaco", monospace;
+  }
+  .log-entry .time { color: #22d3ee; margin-right: 8px; }
+  .log-entry.ai { color: #4ade80; }
+  .log-entry.warn { color: #fbbf24; }
+  .log-entry.plan { color: #a78bfa; }
+  .log-entry.summary { color: #a78bfa; font-weight: 700; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>校园绿色电力小脑</h1>
+  <p class="subtitle">AI智能调度系统 — 输入你的参数，AI自动优化</p>
+
+  <!-- ========== 参数输入面板 ========== -->
+  <div class="panel">
+    <h2>⚙️ 系统参数设置（可自己修改）</h2>
+    <div class="inputs">
+      <div class="field">
+        <label>☀️ 光伏装机容量 (kW)</label>
+        <input type="number" id="inSolarCap" value="25" min="1" max="200" step="1">
+        <div class="hint">屋顶光伏的最大发电功率</div>
+      </div>
+      <div class="field">
+        <label>🔋 储能容量 (kWh)</label>
+        <input type="number" id="inStorageCap" value="40" min="5" max="500" step="5">
+        <div class="hint">电池储能总容量</div>
+      </div>
+      <div class="field">
+        <label>🏫 校园用电规模系数</label>
+        <input type="number" id="inDemandScale" value="1.0" min="0.3" max="3" step="0.1">
+        <div class="hint">1.0=标准，越大用电越多</div>
+      </div>
+      <div class="field">
+        <label>⚡ 峰段电价 (元/kWh)</label>
+        <input type="number" id="inPricePeak" value="1.2" min="0.1" max="3" step="0.1">
+        <div class="hint">18:00–21:00 用电价</div>
+      </div>
+      <div class="field">
+        <label>⚡ 平段电价 (元/kWh)</label>
+        <input type="number" id="inPriceFlat" value="0.8" min="0.1" max="3" step="0.1">
+        <div class="hint">7:00–17:00 用电价</div>
+      </div>
+      <div class="field">
+        <label>⚡ 谷段电价 (元/kWh)</label>
+        <input type="number" id="inPriceValley" value="0.4" min="0.1" max="3" step="0.1">
+        <div class="hint">22:00–6:00 用电价</div>
+      </div>
+      <div class="field">
+        <label>🎯 期望节省电费 (元)</label>
+        <input type="number" id="inTargetSave" value="80" min="0" max="10000" step="5">
+        <div class="hint">AI会努力达成这个目标</div>
+      </div>
+      <div class="field">
+        <label>🤖 AI调度激进程度</label>
+        <input type="number" id="inAggressive" value="1.0" min="0.5" max="2" step="0.1">
+        <div class="hint">1.0=平衡，越大越积极用储能</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn-run" id="btnRun" onclick="runSimulation()">▶ AI智能调度</button>
+    <button class="btn-reset" id="btnReset" onclick="resetSimulation()">↺ 重置</button>
+  </div>
+
+  <!-- 目标达成 -->
+  <div class="target-bar" id="targetBar" style="display:none;">
+    <div class="icon" id="targetIcon">🎯</div>
+    <div class="info">
+      <div class="title">期望节省电费目标</div>
+      <div class="result" id="targetResult">--</div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-bg"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-text" id="progressText">0%</div>
+    </div>
+  </div>
+
+  <!-- 统计卡片 -->
+  <div class="stats">
+    <div class="stat-card"><div class="label">☀️ 光伏发电</div><div class="value yellow" id="statSolar">--<span class="unit">kWh</span></div></div>
+    <div class="stat-card"><div class="label">🏫 校园用电</div><div class="value cyan" id="statDemand">--<span class="unit">kWh</span></div></div>
+    <div class="stat-card"><div class="label">🔋 绿电利用率</div><div class="value green" id="statUtil">--<span class="unit">%</span></div></div>
+    <div class="stat-card"><div class="label">💰 节省电费</div><div class="value purple" id="statSave">--<span class="unit">元</span></div></div>
+    <div class="stat-card"><div class="label">🌱 减少碳排</div><div class="value green" id="statCarbon">--<span class="unit">kg</span></div></div>
+  </div>
+
+  <!-- 图表 -->
+  <div class="chart-wrap">
+    <h2>📊 24小时AI智能调度曲线</h2>
+    <canvas id="chart" width="1100" height="400"></canvas>
+    <div class="legend">
+      <span><i class="dot" style="background:#fbbf24"></i> 光伏发电</span>
+      <span><i class="dot" style="background:#22d3ee"></i> 校园用电</span>
+      <span><i class="dot" style="background:#4ade80"></i> 储能电量</span>
+      <span><i class="dot" style="background:#f87171"></i> 电网购电</span>
+    </div>
+  </div>
+
+  <!-- 日志 -->
+  <div class="log-wrap">
+    <h2>🤖 AI调度日志</h2>
+    <div id="log"></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// 校园绿色电力小脑 — AI智能调度系统
+// 用户输入参数 → AI优化调度 → 可视化结果
+// ============================================================
+
+let running = false;
+
+// 读取用户输入
+function getConfig() {
+  return {
+    solarCap: parseFloat(document.getElementById('inSolarCap').value) || 25,
+    storageCap: parseFloat(document.getElementById('inStorageCap').value) || 40,
+    demandScale: parseFloat(document.getElementById('inDemandScale').value) || 1.0,
+    pricePeak: parseFloat(document.getElementById('inPricePeak').value) || 1.2,
+    priceFlat: parseFloat(document.getElementById('inPriceFlat').value) || 0.8,
+    priceValley: parseFloat(document.getElementById('inPriceValley').value) || 0.4,
+    targetSave: parseFloat(document.getElementById('inTargetSave').value) || 80,
+    aggressive: parseFloat(document.getElementById('inAggressive').value) || 1.0
+  };
+}
+
+function priceAt(h, cfg) {
+  if (h >= 18 && h <= 21) return cfg.pricePeak;
+  if (h >= 7 && h <= 17) return cfg.priceFlat;
+  return cfg.priceValley;
+}
+
+// 光伏发电曲线（按装机容量归一化）
+function solarAt(h, cfg) {
+  if (h < 6 || h > 18) return 0;
+  const x = (h - 12) / 5;
+  return Math.max(0, cfg.solarCap * Math.exp(-1.8 * x * x));
+}
+
+// 校园用电需求（按规模系数缩放）
+function demandAt(h, cfg) {
+  let base;
+  if (h >= 0 && h <= 5) base = 3;
+  else if (h >= 7 && h <= 8) base = 14;
+  else if (h >= 11 && h <= 13) base = 18;
+  else if (h >= 15 && h <= 16) base = 12;
+  else if (h >= 18 && h <= 21) base = 20;
+  else base = 6;
+  return base * cfg.demandScale;
+}
+
+// ============================================================
+// AI智能调度核心算法
+// 策略：
+// 1. 谷段(低电价)：尽量给储能充电（从电网或光伏）
+// 2. 平段：光伏优先供负载，余电充储能
+// 3. 峰段(高电价)：储能优先放电，减少购电
+// 4. 根据"激进程度"调整放电深度
+// 5. 如果达不到节省目标，AI自动加大储能利用
+// ============================================================
+function aiDispatch(cfg) {
+  const maxCharge = cfg.storageCap * 0.2;   // 最大充电功率 = 20%容量
+  const maxDischarge = cfg.storageCap * 0.2;
+  const minReserve = cfg.storageCap * 0.1;  // 最低保留10%
+
+  // 第一次尝试
+  let result = tryDispatch(cfg, maxCharge, maxDischarge, minReserve, cfg.aggressive);
+  
+  // AI迭代优化：如果没达到节省目标，加大调度力度
+  let attempt = 0;
+  while (result.save < cfg.targetSave && attempt < 5) {
+    attempt++;
+    const boost = 1 + attempt * 0.3;
+    result = tryDispatch(cfg, maxCharge * boost, maxDischarge * boost, minReserve, cfg.aggressive * boost);
+  }
+  result.attempts = attempt;
+  return result;
+}
+
+function tryDispatch(cfg, maxCharge, maxDischarge, minReserve, aggressive) {
+  const solar = [], demand = [], storage = [], gridBuy = [], storageFlow = [], logs = [];
+  let soc = cfg.storageCap * 0.5; // 初始50%电量
+
+  for (let h = 0; h < 24; h++) {
+    const pv = solarAt(h, cfg);
+    const dem = demandAt(h, cfg);
+    const price = priceAt(h, cfg);
+    const net = dem - pv;
+    let charge = 0, discharge = 0, buy = 0, fromGridCharge = 0;
+
+    if (price === cfg.priceValley && h >= 22 || h <= 5) {
+      // 谷段：AI主动从电网充电
+      const room = cfg.storageCap - soc;
+      const target = Math.min(room, maxCharge * aggressive, (cfg.storageCap - soc));
+      charge = Math.max(0, target);
+      soc += charge;
+      fromGridCharge = charge;
+      if (net > 0) buy = net; // 负载用电照常购电
+      else {
+        // 光伏余电先供给负载，多余的也算充电
+      }
+      if (charge > 0.1) {
+        logs.push({ h, msg: `谷段低电价，AI从电网充电 ${charge.toFixed(1)}kW 储能`, type: 'plan' });
+      }
+    } else if (net < 0) {
+      // 光伏有余电
+      const surplus = -net;
+      charge = Math.min(surplus, maxCharge, cfg.storageCap - soc);
+      soc += charge;
+      if (charge > 0.1) logs.push({ h, msg: `光伏余电 ${surplus.toFixed(1)}kW，储能充电 ${charge.toFixed(1)}kW`, type: 'ai' });
+    } else if (net > 0) {
+      // 缺电：优先储能放电
+      const need = net;
+      if (soc > minReserve) {
+        discharge = Math.min(need, maxDischarge * aggressive, soc - minReserve);
+        soc -= discharge;
+      }
+      buy = need - discharge;
+      if (price === cfg.pricePeak && discharge > 0.1) {
+        logs.push({ h, msg: `⚡高峰电价，AI调度储能放电 ${discharge.toFixed(1)}kW，购电仅 ${buy.toFixed(1)}kW`, type: 'ai' });
+      } else if (discharge > 0.1) {
+        logs.push({ h, msg: `储能放电 ${discharge.toFixed(1)}kW，购电 ${buy.toFixed(1)}kW`, type: 'ai' });
+      } else {
+        logs.push({ h, msg: `储能不足，电网购电 ${buy.toFixed(1)}kW`, type: 'warn' });
+      }
+    } else {
+      logs.push({ h, msg: `光伏与用电刚好平衡`, type: '' });
+    }
+
+    solar.push(pv);
+    demand.push(dem);
+    storage.push(soc);
+    gridBuy.push(buy);
+    storageFlow.push(charge - discharge);
+  }
+
+  const totalSolar = solar.reduce((a, b) => a + b, 0);
+  const totalDemand = demand.reduce((a, b) => a + b, 0);
+  const totalBuy = gridBuy.reduce((a, b) => a + b, 0);
+  const totalDischarge = storageFlow.filter(x => x < 0).reduce((a, b) => a + Math.abs(b), 0);
+  const greenUsed = Math.max(0, totalDemand - totalBuy);
+  const util = totalDemand > 0 ? (greenUsed / totalDemand * 100) : 0;
+
+  // 电费对比：有AI vs 无AI（全部从电网买）
+  let costWithAI = 0, costWithout = 0;
+  for (let h = 0; h < 24; h++) {
+    costWithAI += gridBuy[h] * priceAt(h, cfg);
+    costWithout += demand[h] * priceAt(h, cfg);
+  }
+  const save = Math.max(0, costWithout - costWithAI);
+  const carbon = totalDischarge * 0.581 + totalSolar * 0.581;
+
+  logs.push({
+    h: '📋',
+    msg: `方案：光伏 ${totalSolar.toFixed(1)}kWh，储能放电 ${totalDischarge.toFixed(1)}kWh，购电 ${totalBuy.toFixed(1)}kWh，节省 ${save.toFixed(1)} 元，减碳 ${carbon.toFixed(1)} kg`,
+    type: 'summary'
+  });
+
+  return { solar, demand, storage, gridBuy, storageFlow, logs,
+    totalSolar, totalDemand, totalBuy, greenUsed, util, save, carbon,
+    costWithAI, costWithout };
+}
+
+// ============================================================
+// 绘图
+// ============================================================
+function drawChart(d, progress, cfg) {
+  const canvas = document.getElementById('chart');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const pad = { top: 30, right: 30, bottom: 40, left: 60 };
+  const pw = W - pad.left - pad.right;
+  const ph = H - pad.top - pad.bottom;
+  const maxY = Math.max(cfg.solarCap, cfg.storageCap, cfg.demandScale * 22) * 1.15;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  ctx.fillRect(pad.left, pad.top, pw, ph);
+
+  // 网格
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  ctx.font = '11px "Microsoft YaHei"';
+  for (let i = 0; i <= 5; i++) {
+    const y = pad.top + ph * i / 5;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + pw, y); ctx.stroke();
+    ctx.fillStyle = '#4a5a6a'; ctx.textAlign = 'right';
+    ctx.fillText((maxY * (5 - i) / 5).toFixed(0), pad.left - 8, y + 4);
+  }
+
+  // X轴
+  ctx.fillStyle = '#4a5a6a'; ctx.textAlign = 'center';
+  for (let h = 0; h < 24; h += 3) {
+    const x = pad.left + pw * h / 23;
+    ctx.fillText(h + ':00', x, H - pad.bottom + 20);
+  }
+
+  // 峰谷背景色
+  ctx.fillStyle = 'rgba(248,113,113,0.06)';
+  ctx.fillRect(pad.left + pw * 18 / 23, pad.top, pw * 3 / 23, ph); // 峰
+  ctx.fillStyle = 'rgba(74,222,128,0.05)';
+  ctx.fillRect(pad.left, pad.top, pw * 6 / 23, ph); // 谷
+  ctx.fillRect(pad.left + pw * 22 / 23, pad.top, pw * 1 / 23, ph);
+
+  function plotLine(arr, color, width, dash) {
+    ctx.strokeStyle = color; ctx.lineWidth = width;
+    ctx.setLineDash(dash || []);
+    ctx.beginPath();
+    let started = false;
+    for (let h = 0; h < 24; h++) {
+      if (arr[h] === undefined || isNaN(arr[h])) continue;
+      const x = pad.left + pw * h / 23;
+      const y = pad.top + ph * (1 - arr[h] / maxY);
+      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // 储能面积
+  ctx.fillStyle = 'rgba(74, 222, 128, 0.12)';
+  ctx.beginPath();
+  let startedArea = false;
+  for (let h = 0; h < 24; h++) {
+    if (d.storage[h] === undefined || isNaN(d.storage[h])) continue;
+    const x = pad.left + pw * h / 23;
+    const y = pad.top + ph * (1 - d.storage[h] / maxY);
+    if (!startedArea) { ctx.moveTo(x, pad.top + ph); ctx.lineTo(x, y); startedArea = true; }
+    else ctx.lineTo(x, y);
+  }
+  if (startedArea) {
+    const lastX = pad.left + pw * (progress - 1) / 23;
+    ctx.lineTo(lastX, pad.top + ph);
+    ctx.closePath(); ctx.fill();
+  }
+
+  plotLine(d.solar, '#fbbf24', 2.5);
+  plotLine(d.demand, '#22d3ee', 2, [6, 4]);
+  plotLine(d.storage, '#4ade80', 2);
+  plotLine(d.gridBuy, '#f87171', 2);
+}
+
+function updateStats(d, cfg) {
+  document.getElementById('statSolar').innerHTML = d.totalSolar.toFixed(1) + '<span class="unit">kWh</span>';
+  document.getElementById('statDemand').innerHTML = d.totalDemand.toFixed(1) + '<span class="unit">kWh</span>';
+  document.getElementById('statUtil').innerHTML = d.util.toFixed(0) + '<span class="unit">%</span>';
+  document.getElementById('statSave').innerHTML = d.save.toFixed(1) + '<span class="unit">元</span>';
+  document.getElementById('statCarbon').innerHTML = d.carbon.toFixed(1) + '<span class="unit">kg</span>';
+
+  // 目标达成
+  const bar = document.getElementById('targetBar');
+  bar.style.display = 'flex';
+  const pct = Math.min(100, (d.save / cfg.targetSave) * 100);
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = pct.toFixed(0) + '%';
+  const icon = document.getElementById('targetIcon');
+  const res = document.getElementById('targetResult');
+  if (d.save >= cfg.targetSave) {
+    icon.textContent = '🎉';
+    res.innerHTML = `<span style="color:#4ade80">已达成！实际节省 ${d.save.toFixed(1)} 元 / 目标 ${cfg.targetSave} 元</span>`;
+  } else {
+    icon.textContent = '📈';
+    res.innerHTML = `<span style="color:#fbbf24">接近目标：实际节省 ${d.save.toFixed(1)} 元 / 目标 ${cfg.targetSave} 元</span>`;
+  }
+}
+
+// ============================================================
+// 运行 & 重置
+// ============================================================
+function runSimulation() {
+  if (running) return;
+  running = true;
+  document.getElementById('btnRun').disabled = true;
+  document.getElementById('btnReset').disabled = true;
+
+  const cfg = getConfig();
+  const d = aiDispatch(cfg);
+  document.getElementById('log').innerHTML = '';
+  ['statSolar','statDemand','statUtil','statSave','statCarbon'].forEach(id => {
+    document.getElementById(id).innerHTML = '--<span class="unit">' + (id === 'statSave' ? '元' : id === 'statCarbon' ? 'kg' : id === 'statUtil' ? '%' : 'kWh') + '</span>';
+  });
+
+  // 先显示AI规划日志
+  const logEl = document.getElementById('log');
+  const planDiv = document.createElement('div');
+  planDiv.className = 'log-entry plan';
+  planDiv.innerHTML = `<span class="time">🤖</span>AI已接收参数：光伏${cfg.solarCap}kW / 储能${cfg.storageCap}kWh / 目标节省${cfg.targetSave}元，开始智能调度...`;
+  logEl.appendChild(planDiv);
+
+  if (d.attempts > 0) {
+    const optDiv = document.createElement('div');
+    optDiv.className = 'log-entry plan';
+    optDiv.innerHTML = `<span class="time">🔄</span>AI迭代优化 ${d.attempts} 次，加大储能调度力度以逼近目标`;
+    logEl.appendChild(optDiv);
+  }
+
+  let step = 0;
+  const timer = setInterval(() => {
+    if (step >= 24) {
+      clearInterval(timer);
+      updateStats(d, cfg);
+      running = false;
+      document.getElementById('btnRun').disabled = false;
+      document.getElementById('btnReset').disabled = false;
+      return;
+    }
+
+    const partial = { solar: [], demand: [], storage: [], gridBuy: [] };
+    for (let i = 0; i < 24; i++) {
+      if (i <= step) {
+        partial.solar.push(d.solar[i]);
+        partial.demand.push(d.demand[i]);
+        partial.storage.push(d.storage[i]);
+        partial.gridBuy.push(d.gridBuy[i]);
+      } else {
+        partial.solar.push(NaN); partial.demand.push(NaN);
+        partial.storage.push(NaN); partial.gridBuy.push(NaN);
+      }
+    }
+    drawChart(partial, step + 1, cfg);
+
+    const log = d.logs[step];
+    if (log) {
+      const div = document.createElement('div');
+      div.className = 'log-entry ' + log.type;
+      const timeStr = typeof log.h === 'number' ? String(log.h).padStart(2, '0') + ':00' : log.h;
+      div.innerHTML = `<span class="time">${timeStr}</span>${log.msg}`;
+      logEl.appendChild(div);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+    step++;
+  }, 110);
+}
+
+function resetSimulation() {
+  if (running) return;
+  drawEmptyChart();
+  document.getElementById('log').innerHTML = '';
+  document.getElementById('targetBar').style.display = 'none';
+  ['statSolar','statDemand','statUtil','statSave','statCarbon'].forEach(id => {
+    document.getElementById(id).innerHTML = '--<span class="unit">' + (id === 'statSave' ? '元' : id === 'statCarbon' ? 'kg' : id === 'statUtil' ? '%' : 'kWh') + '</span>';
+  });
+}
+
+function drawEmptyChart() {
+  const canvas = document.getElementById('chart');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const pad = { top: 30, right: 30, bottom: 40, left: 60 };
+  const pw = W - pad.left - pad.right;
+  const ph = H - pad.top - pad.bottom;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  ctx.fillRect(pad.left, pad.top, pw, ph);
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  for (let i = 0; i <= 5; i++) {
+    const y = pad.top + ph * i / 5;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + pw, y); ctx.stroke();
+  }
+  ctx.fillStyle = '#4a5a6a'; ctx.font = '15px "Microsoft YaHei"';
+  ctx.textAlign = 'center';
+  ctx.fillText('设置参数后点击「AI智能调度」开始', W / 2, H / 2);
+}
+
+window.onload = drawEmptyChart;
+</script>
+</body>
+</html>
